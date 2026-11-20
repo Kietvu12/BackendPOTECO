@@ -1,0 +1,22 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: poteco-deploy
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, poteco]
+    steps:
+      - name: Pull code, cài thư viện, migrate, restart
+        run: |
+          set -e
+          cd /home/BackendPOTECO
+          git pull --ff-only origin main
+          npm ci --omit=dev
+          SQL_DIR=db node db/migrate.js
+          pm2 restart poteco-api --update-env
+          pm2 save
