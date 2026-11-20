@@ -53,7 +53,10 @@ function taoApp({ ghiNhatKyYeuCau = false } = {}) {
     })
   }
 
-  app.use(TIEN_TO, router)
+  // Mac dinh chi mount /api/v1. Sau reverse proxy (vd https://host/api_poteco) dat API_PREFIX
+  // cho khop, ke ca khi proxy cat hoac khong cat tien to.
+  const tienTo = config.apiPrefix.length ? config.apiPrefix : [TIEN_TO]
+  for (const p of [...new Set(tienTo)]) app.use(p, router)
 
   app.use((_req, _res, next) => next(new AppError(404, 'KHONG_TIM_THAY', 'Đường dẫn không tồn tại')))
 

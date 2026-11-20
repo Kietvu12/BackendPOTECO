@@ -31,6 +31,9 @@ module.exports = {
   refreshTtlNgay: so('REFRESH_TTL_NGAY', 30),
   corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean),
   trustProxy: process.env.TRUST_PROXY || '',
+  // Cac tien to URL mount API, cach nhau dau phay (vd "/api/v1,/api_poteco,/"). "/" = khong tien to.
+  apiPrefix: (process.env.API_PREFIX || '/api/v1').split(',').map(s => s.trim()).filter(Boolean)
+    .map(s => (s === '/' ? '' : '/' + s.replace(/^\/+|\/+$/g, ''))),
   donNhatKyTuDong: process.env.DON_NHAT_KY_TU_DONG === '1',
   dangNhapSaiToiDa: so('DANG_NHAP_SAI_TOI_DA', 5),
   dangNhapKhoaPhut: so('DANG_NHAP_KHOA_PHUT', 15),
