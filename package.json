@@ -1,0 +1,29 @@
+{
+  "name": "backend-poteco",
+  "version": "0.1.0",
+  "description": "Backend Node.js cho he thong khao sat tuyen cap POTECO",
+  "main": "src/server.js",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "db:migrate": "node db/migrate.js",
+    "tao-tai-khoan": "node scripts/tao-tai-khoan.js",
+    "xuat-api": "node scripts/xuat-api.js",
+    "tai-lieu": "node scripts/tai-lieu.js",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "fast-xml-parser": "^5.12.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  }
+}
