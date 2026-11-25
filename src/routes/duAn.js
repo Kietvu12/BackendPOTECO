@@ -33,7 +33,7 @@ dang({
     const f = phanTich(z.object({ cha_id: uuid.optional(), goc: z.enum(['0', '1']).optional(), q: z.string().trim().max(100).optional() }).passthrough(), req.query, 'query')
     const ids = await idTrongPham(req, req.pham_vi)
     const tham = [ids, f.cha_id || null, f.goc === '1', f.q ? `%${f.q.replace(/[%_\\]/g, m => '\\' + m)}%` : null]
-    const dk = `d.xoa_luc IS NULL AND ($1::uuid[] IS NULL OR d.tao_boi = ANY($1))
+    const dk = `d.xoa_luc IS NULL AND ($1::uuid[] IS NULL OR d.tao_boi = ANY($1::uuid[]))
       AND ($2::uuid IS NULL OR d.cha_id = $2) AND (NOT $3::boolean OR d.cha_id IS NULL) AND ($4::text IS NULL OR d.ten ILIKE $4)`
     const tong = (await db.query(`SELECT count(*)::int AS n FROM du_an d WHERE ${dk}`, tham)).rows[0].n
     const rows = (await db.query(`SELECT ${COT} ${TU} WHERE ${dk} ORDER BY d.ten, d.id LIMIT $5 OFFSET $6`, [...tham, p.so_luong, p.offset])).rows

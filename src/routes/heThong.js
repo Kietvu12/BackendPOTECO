@@ -23,7 +23,7 @@ dang({
                 count(*) FILTER (WHERE trang_thai = 'hoan_thien')::int AS hoan_thien,
                 COALESCE(sum(chieu_dai_tuyen_m), 0)::float8 AS tong_chieu_dai_tuyen_m,
                 COALESCE(sum(chieu_dai_cap_m), 0)::float8 AS tong_chieu_dai_cap_m
-           FROM tuyen WHERE xoa_luc IS NULL AND ($1::uuid[] IS NULL OR tao_boi = ANY($1))`, [ids]),
+           FROM tuyen WHERE xoa_luc IS NULL AND ($1::uuid[] IS NULL OR tao_boi = ANY($1::uuid[]))`, [ids]),
       db.query(
         `WITH hom_nay AS (SELECT (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS d)
          SELECT to_char(g.d, 'YYYY-MM-DD') AS ngay,

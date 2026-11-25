@@ -93,8 +93,10 @@ async function danhSach(req, query) {
     query.trang_thai || null,
     query.q ? `%${String(query.q).replace(/[%_\\]/g, m => '\\' + m)}%` : null,
   ]
+  // Bắt buộc ép $1::uuid[] ở cả IS NULL và ANY — nếu chỉ cast một chỗ, pg có thể
+  // suy text[] và so khớp uuid thất bại / trả rỗng tùy phiên bản.
   const dieuKien = `t.xoa_luc IS NULL
-      AND ($1::uuid[] IS NULL OR t.tao_boi = ANY($1))
+      AND ($1::uuid[] IS NULL OR t.tao_boi = ANY($1::uuid[]))
       AND ($2::uuid IS NULL OR t.tao_boi = $2)
       AND ($3::uuid IS NULL OR t.du_an_id = $3)
       AND ($4::text IS NULL OR t.trang_thai = $4)
@@ -103,7 +105,10 @@ async function danhSach(req, query) {
   const rows = (await db.query(
     `SELECT t.id, t.du_an_id, t.ten_tuyen, t.loai_cong_trinh_id, t.so_cot, t.chieu_dai_tuyen_m,
             t.he_so_n, t.chieu_dai_cap_m,
-            t.phan_tram_lech_bac, t.phan_tram_lech_nam, t.phan_tram_lech_dong, t.phan_tram_lech_tay,
+            COALESCE(t.phan_tram_lech_bac, 0) AS phan_tram_lech_bac,
+            COALESCE(t.phan_tram_lech_nam, 0) AS phan_tram_lech_nam,
+            COALESCE(t.phan_tram_lech_dong, 0) AS phan_tram_lech_dong,
+            COALESCE(t.phan_tram_lech_tay, 0) AS phan_tram_lech_tay,
             t.trang_thai, t.hoan_thien_luc, t.phien_ban_hien_tai,
             t.nguon_tao, t.tao_boi, tk.ho_ten AS tao_boi_ho_ten, t.tao_luc, t.cap_nhat_luc
        FROM tuyen t JOIN tai_khoan tk ON tk.id = t.tao_boi

@@ -201,7 +201,7 @@ const HOAN_THIEN_TU = `
                count(*) FILTER (WHERE p.loai_luu = 'chinh_sua_sau')::int AS so_lan_chinh_sua_sau
           FROM tuyen_phien_ban p WHERE p.tuyen_id = t.id) pb ON true
   WHERE t.xoa_luc IS NULL AND t.trang_thai = 'hoan_thien'
-    AND ($1::uuid[] IS NULL OR t.tao_boi = ANY($1))
+    AND ($1::uuid[] IS NULL OR t.tao_boi = ANY($1::uuid[]))
     AND ($2::uuid IS NULL OR t.tao_boi = $2)
     AND ($3::date IS NULL OR t.hoan_thien_luc >= ($3::date)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh')
     AND ($4::date IS NULL OR t.hoan_thien_luc <  (($4::date + 1)::timestamp AT TIME ZONE 'Asia/Ho_Chi_Minh'))`
@@ -265,7 +265,7 @@ const KHOI_LUONG_TU = `
   JOIN tai_khoan tk ON tk.id = t.tao_boi
   LEFT JOIN dm_loai_cong_trinh l ON l.id = t.loai_cong_trinh_id
   WHERE t.xoa_luc IS NULL
-    AND ($1::uuid[] IS NULL OR t.tao_boi = ANY($1))
+    AND ($1::uuid[] IS NULL OR t.tao_boi = ANY($1::uuid[]))
     AND ($2::uuid IS NULL OR t.tao_boi = $2)
     AND ($3::uuid IS NULL OR t.du_an_id = $3)
     AND ($4::int IS NULL OR t.loai_cong_trinh_id = $4)
