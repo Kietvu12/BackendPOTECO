@@ -16,6 +16,24 @@ const gio = z.string().datetime({ offset: true })
 const gps = z.object({ kinh_do: kinhDo, vi_do: viDo, do_chinh_xac_m: z.number().min(0).max(100000).optional() }).strict()
 const dauVet = { thoi_gian_thiet_bi: gio.optional(), gps: gps.optional() }
 
+/** % lệch theo hướng; bỏ trống / không gửi → 0 khi tạo, không đổi khi sửa (undefined). */
+const phanTramLech = z.preprocess(v => {
+  if (v === undefined) return undefined
+  if (v === null || v === '') return 0
+  if (typeof v === 'string') {
+    const n = Number(v.trim().replace(',', '.').replace(/%$/, ''))
+    return Number.isFinite(n) ? n : v
+  }
+  return v
+}, z.number().min(0).max(100))
+const phanTramLechTuyChon = phanTramLech.optional()
+const truongLech = {
+  phan_tram_lech_bac: phanTramLechTuyChon,
+  phan_tram_lech_nam: phanTramLechTuyChon,
+  phan_tram_lech_dong: phanTramLechTuyChon,
+  phan_tram_lech_tay: phanTramLechTuyChon,
+}
+
 const duongSchema = z.object({
   loai: z.enum(['do_duong', 've_tay']).optional(),
   ten: z.string().trim().max(200).nullable().optional(),
@@ -32,7 +50,7 @@ dang({
   method: 'get', path: '/tuyen', quyen: 'tuyen.xem', nhom: NHOM,
   tom_tat: 'Danh sách tuyến trong phạm vi được xem',
   tham_so: 'Query: trang, so_luong, tao_boi (id nhân viên), du_an_id, trang_thai (dang_khao_sat|hoan_thien), q (tên tuyến)',
-  ket_qua: 'Phân trang { du_lieu, phan_trang }; mỗi tuyến có so_cot, chieu_dai_tuyen_m, he_so_n, chieu_dai_cap_m, phien_ban_hien_tai',
+  ket_qua: 'Phân trang { du_lieu, phan_trang }; mỗi tuyến có so_cot, chieu_dai_tuyen_m, he_so_n, chieu_dai_cap_m, phan_tram_lech_*, phien_ban_hien_tai',
   xuLy: async (req, res) => res.json(await tuyenSv.danhSach(req, req.query)),
 })
 
@@ -41,15 +59,16 @@ const tuyenTao = z.object({
   du_an_id: uuid.nullable().optional(),
   loai_cong_trinh_id: z.number().int().positive().nullable().optional(),
   nguon_tao: z.enum(['android', 'web']).optional(),
+  ...truongLech,
   ...dauVet,
 }).strict()
 
 dang({
   method: 'post', path: '/tuyen', quyen: 'tuyen.tao', nhom: NHOM,
   tom_tat: 'Tạo tuyến rỗng',
-  tham_so: 'Body: ten_tuyen, du_an_id, loai_cong_trinh_id, nguon_tao (android|web), thoi_gian_thiet_bi, gps',
+  tham_so: 'Body: ten_tuyen, du_an_id, loai_cong_trinh_id, nguon_tao (android|web), phan_tram_lech_bac|nam|dong|tay (0–100, mặc định 0), thoi_gian_thiet_bi, gps',
   ket_qua: '201 + tuyến',
-  ghi_chu: 'Tiền tố "T_" ở đầu tên bị bỏ. Tên không phân biệt hoa thường và phải duy nhất trong cùng dự án (409). Chưa có phiên bản cho đến khi gọi POST /tuyen/:id/luu.',
+  ghi_chu: 'Tiền tố "T_" ở đầu tên bị bỏ. Tên không phân biệt hoa thường và phải duy nhất trong cùng dự án (409). Chưa có phiên bản cho đến khi gọi POST /tuyen/:id/luu. % lệch theo hướng không gửi thì = 0.',
   xuLy: async (req, res) => res.status(201).json(await tuyenSv.tao(req, phanTich(tuyenTao, req.body))),
 })
 
@@ -83,14 +102,15 @@ const tuyenSua = z.object({
   ten_tuyen: z.string().trim().min(1).max(200).optional(),
   du_an_id: uuid.nullable().optional(),
   loai_cong_trinh_id: z.number().int().positive().nullable().optional(),
+  ...truongLech,
   ...dauVet,
 }).strict()
 
 dang({
   method: 'patch', path: '/tuyen/:id', quyen: 'tuyen.sua', nhom: NHOM,
-  tom_tat: 'Sửa tên, dự án, loại công trình của tuyến',
-  tham_so: 'Body: ten_tuyen, du_an_id, loai_cong_trinh_id',
-  ghi_chu: 'Đổi loại công trình tính lại hệ số n và chiều dài cáp = chiều dài tuyến × n ngay (chưa tạo phiên bản).',
+  tom_tat: 'Sửa tên, dự án, loại công trình, % lệch theo hướng của tuyến',
+  tham_so: 'Body: ten_tuyen, du_an_id, loai_cong_trinh_id, phan_tram_lech_bac|nam|dong|tay',
+  ghi_chu: 'Đổi loại công trình tính lại hệ số n và chiều dài cáp = chiều dài tuyến × n ngay (chưa tạo phiên bản). % lệch không gửi thì giữ nguyên.',
   xuLy: async (req, res) => res.json(await tuyenSv.suaThongTin(req, layId(req), phanTich(tuyenSua, req.body))),
 })
 
@@ -109,6 +129,7 @@ const luuSchema = z.object({
   ghi_de: z.boolean().optional(),
   loai_luu: z.enum(['hien_truong', 'chinh_sua_sau']).optional(),
   loai_cong_trinh_id: z.number().int().positive().nullable().optional(),
+  ...truongLech,
   cot: z.array(cotTaoSchema).max(5000).optional(),
   duong: z.array(duongSchema).max(200).optional(),
   track: z.array(diemTrack).max(100000).optional(),

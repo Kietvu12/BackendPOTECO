@@ -185,6 +185,15 @@ CREATE TABLE tuyen (
     chieu_dai_tuyen_m   numeric(12,2) CHECK (chieu_dai_tuyen_m >= 0),
     he_so_n             numeric(6,3)  CHECK (he_so_n > 0),
     chieu_dai_cap_m     numeric(12,2) CHECK (chieu_dai_cap_m >= 0),
+    -- % chênh lệch tuyến theo hướng; không nhập = 0
+    phan_tram_lech_bac  numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_bac  >= 0 AND phan_tram_lech_bac  <= 100),
+    phan_tram_lech_nam  numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_nam  >= 0 AND phan_tram_lech_nam  <= 100),
+    phan_tram_lech_dong numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_dong >= 0 AND phan_tram_lech_dong <= 100),
+    phan_tram_lech_tay  numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_tay  >= 0 AND phan_tram_lech_tay  <= 100),
     trang_thai          varchar(20)  NOT NULL DEFAULT 'dang_khao_sat'
                         CHECK (trang_thai IN ('dang_khao_sat','hoan_thien')),
     hoan_thien_luc      timestamptz,
@@ -331,6 +340,14 @@ CREATE TABLE tuyen_phien_ban (
     loai_cong_trinh_id  smallint     REFERENCES dm_loai_cong_trinh(id),
     he_so_n             numeric(6,3),
     chieu_dai_cap_m     numeric(12,2),
+    phan_tram_lech_bac  numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_bac  >= 0 AND phan_tram_lech_bac  <= 100),
+    phan_tram_lech_nam  numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_nam  >= 0 AND phan_tram_lech_nam  <= 100),
+    phan_tram_lech_dong numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_dong >= 0 AND phan_tram_lech_dong <= 100),
+    phan_tram_lech_tay  numeric(6,2) NOT NULL DEFAULT 0
+                        CHECK (phan_tram_lech_tay  >= 0 AND phan_tram_lech_tay  <= 100),
 
     so_cot_them         integer      NOT NULL DEFAULT 0,
     so_cot_sua          integer      NOT NULL DEFAULT 0,

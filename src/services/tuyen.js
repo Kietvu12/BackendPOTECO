@@ -9,6 +9,17 @@ const { phanTrangTuQuery, boc } = require('../validate')
 
 const { TRUONG_SUA } = cotSv
 const TRUONG_BOOL_MAC_DINH = { hien_ly_trinh: false, nhan_doi_phu_kien: false, dat_bien_bao: false }
+const TRUONG_LECH = ['phan_tram_lech_bac', 'phan_tram_lech_nam', 'phan_tram_lech_dong', 'phan_tram_lech_tay']
+
+/** Chuẩn hóa % lệch: thiếu / null → 0 (API luôn trả số). */
+function chuanHoaLech (t) {
+  if (!t) return t
+  for (const k of TRUONG_LECH) {
+    const n = Number(t[k])
+    t[k] = Number.isFinite(n) ? n : 0
+  }
+  return t
+}
 
 // ---------------------------------------------------------------- truy cap
 
@@ -91,13 +102,15 @@ async function danhSach(req, query) {
   const tong = (await db.query(`SELECT count(*)::int AS n FROM tuyen t WHERE ${dieuKien}`, tham)).rows[0].n
   const rows = (await db.query(
     `SELECT t.id, t.du_an_id, t.ten_tuyen, t.loai_cong_trinh_id, t.so_cot, t.chieu_dai_tuyen_m,
-            t.he_so_n, t.chieu_dai_cap_m, t.trang_thai, t.hoan_thien_luc, t.phien_ban_hien_tai,
+            t.he_so_n, t.chieu_dai_cap_m,
+            t.phan_tram_lech_bac, t.phan_tram_lech_nam, t.phan_tram_lech_dong, t.phan_tram_lech_tay,
+            t.trang_thai, t.hoan_thien_luc, t.phien_ban_hien_tai,
             t.nguon_tao, t.tao_boi, tk.ho_ten AS tao_boi_ho_ten, t.tao_luc, t.cap_nhat_luc
        FROM tuyen t JOIN tai_khoan tk ON tk.id = t.tao_boi
       WHERE ${dieuKien}
       ORDER BY t.cap_nhat_luc DESC, t.id
       LIMIT $6 OFFSET $7`, [...tham, p.so_luong, p.offset])).rows
-  return boc(rows, p, tong)
+  return boc(rows.map(chuanHoaLech), p, tong)
 }
 
 async function chiTiet(req, id, kem) {
@@ -114,7 +127,7 @@ async function chiTiet(req, id, kem) {
   if (tap.has('cot')) kq.cot = (await layCotHienTai(db, t.id)).map(cotRaDoiTuong)
   if (tap.has('duong')) kq.duong = await layDuong(db, t.id)
   if (tap.has('track')) kq.track = await layTrack(db, t.id)
-  return kq
+  return chuanHoaLech(kq)
 }
 
 function cotRaDoiTuong(r) {
@@ -129,16 +142,22 @@ async function tao(req, body) {
     if (body.du_an_id) await kiemTraDuAn(req, c, body.du_an_id)
     if (body.loai_cong_trinh_id) await kiemTraLoaiCongTrinh(c, body.loai_cong_trinh_id)
     const ten = body.ten_tuyen.replace(/^T_/i, '')
+    const lech = TRUONG_LECH.map(k => (body[k] !== undefined ? body[k] : 0))
     const kq = await c.query(
-      `INSERT INTO tuyen (ten_tuyen, du_an_id, loai_cong_trinh_id, nguon_tao, tao_boi)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [ten, body.du_an_id || null, body.loai_cong_trinh_id || null, body.nguon_tao || 'android', req.user.id])
+      `INSERT INTO tuyen (ten_tuyen, du_an_id, loai_cong_trinh_id, nguon_tao, tao_boi,
+          phan_tram_lech_bac, phan_tram_lech_nam, phan_tram_lech_dong, phan_tram_lech_tay)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [ten, body.du_an_id || null, body.loai_cong_trinh_id || null, body.nguon_tao || 'android', req.user.id, ...lech])
     const id = kq.rows[0].id
-    const t = await tinhLai(c, id)
+    const t = chuanHoaLech(await tinhLai(c, id))
     await nhatKy.ghi(c, {
       tai_khoan_id: req.user.id, thiet_bi_id: req.thietBiId, tuyen_id: id, hanh_dong: 'tao',
       thoi_gian_thiet_bi: body.thoi_gian_thiet_bi, gps: body.gps,
-      chi_tiet: { ten_tuyen: ten, loai_cong_trinh_id: body.loai_cong_trinh_id || null },
+      chi_tiet: {
+        ten_tuyen: ten, loai_cong_trinh_id: body.loai_cong_trinh_id || null,
+        phan_tram_lech_bac: lech[0], phan_tram_lech_nam: lech[1],
+        phan_tram_lech_dong: lech[2], phan_tram_lech_tay: lech[3],
+      },
     })
     return t
   })
@@ -160,10 +179,13 @@ async function suaThongTin(req, id, body) {
       if (body.loai_cong_trinh_id !== null) await kiemTraLoaiCongTrinh(c, body.loai_cong_trinh_id, t.loai_cong_trinh_id)
       them('loai_cong_trinh_id', body.loai_cong_trinh_id)
     }
+    for (const k of TRUONG_LECH) {
+      if (body[k] !== undefined) them(k, body[k])
+    }
     if (!sets.length) throw loi.yeuCauSai('Không có trường nào để sửa')
     val.push(id)
     await c.query(`UPDATE tuyen SET ${sets.join(', ')} WHERE id = $${val.length}`, val)
-    const moi = await tinhLai(c, id)
+    const moi = chuanHoaLech(await tinhLai(c, id))
     await nhatKy.ghi(c, {
       tai_khoan_id: req.user.id, thiet_bi_id: req.thietBiId, tuyen_id: id, hanh_dong: 'sua',
       thoi_gian_thiet_bi: body.thoi_gian_thiet_bi, gps: body.gps,
@@ -343,7 +365,9 @@ async function thietBiTuMa(c, req, ma) {
 
 const COT_PHIEN_BAN = `id, tuyen_id, so_phien_ban, loai_luu, la_ban_hoan_thien, tai_khoan_id, thiet_bi_id,
   thoi_gian_thiet_bi, thoi_gian_server, gps_kinh_do, gps_vi_do, gps_do_chinh_xac_m, so_cot,
-  chieu_dai_tuyen_m, loai_cong_trinh_id, he_so_n, chieu_dai_cap_m, so_cot_them, so_cot_sua, so_cot_xoa`
+  chieu_dai_tuyen_m, loai_cong_trinh_id, he_so_n, chieu_dai_cap_m,
+  phan_tram_lech_bac, phan_tram_lech_nam, phan_tram_lech_dong, phan_tram_lech_tay,
+  so_cot_them, so_cot_sua, so_cot_xoa`
 
 async function luu(req, tuyenId, body) {
   return db.giaoDich(async c => {
@@ -365,6 +389,18 @@ async function luu(req, tuyenId, body) {
     if (body.loai_cong_trinh_id !== undefined) {
       if (body.loai_cong_trinh_id !== null) await kiemTraLoaiCongTrinh(c, body.loai_cong_trinh_id, t0.loai_cong_trinh_id)
       await c.query('UPDATE tuyen SET loai_cong_trinh_id = $1 WHERE id = $2', [body.loai_cong_trinh_id, tuyenId])
+    }
+    const lechSets = []
+    const lechVal = []
+    for (const k of TRUONG_LECH) {
+      if (body[k] !== undefined) {
+        lechVal.push(body[k])
+        lechSets.push(`${k} = $${lechVal.length}`)
+      }
+    }
+    if (lechSets.length) {
+      lechVal.push(tuyenId)
+      await c.query(`UPDATE tuyen SET ${lechSets.join(', ')} WHERE id = $${lechVal.length}`, lechVal)
     }
     const cat = await danhMuc.lay(c)
     if (body.cot) await dongBoCot(c, req, tuyenId, body.cot, cat)
@@ -396,16 +432,20 @@ async function chotPhienBan(c, req, t0, opts) {
   const thietBiId = await thietBiTuMa(c, req, opts.ma_thiet_bi)
   const soMoi = t0.phien_ban_hien_tai + 1
   const gps = opts.gps || {}
+  const tLech = chuanHoaLech({ ...t })
   const pb = (await c.query(
     `INSERT INTO tuyen_phien_ban
        (tuyen_id, so_phien_ban, loai_luu, tai_khoan_id, thiet_bi_id, thoi_gian_thiet_bi,
         gps_kinh_do, gps_vi_do, gps_do_chinh_xac_m, so_cot, chieu_dai_tuyen_m, loai_cong_trinh_id,
-        he_so_n, chieu_dai_cap_m, so_cot_them, so_cot_sua, so_cot_xoa, hinh_dang, du_lieu_cot, ma_yeu_cau)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19::jsonb,$20)
+        he_so_n, chieu_dai_cap_m,
+        phan_tram_lech_bac, phan_tram_lech_nam, phan_tram_lech_dong, phan_tram_lech_tay,
+        so_cot_them, so_cot_sua, so_cot_xoa, hinh_dang, du_lieu_cot, ma_yeu_cau)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb,$23::jsonb,$24)
      RETURNING ${COT_PHIEN_BAN}`,
     [tuyenId, soMoi, loaiLuu, req.user.id, thietBiId, opts.thoi_gian_thiet_bi || null,
       gps.kinh_do ?? null, gps.vi_do ?? null, gps.do_chinh_xac_m ?? null,
       t.so_cot, t.chieu_dai_tuyen_m, t.loai_cong_trinh_id, t.he_so_n, t.chieu_dai_cap_m,
+      tLech.phan_tram_lech_bac, tLech.phan_tram_lech_nam, tLech.phan_tram_lech_dong, tLech.phan_tram_lech_tay,
       ss.them.length, ss.sua.length, ss.xoa.length,
       JSON.stringify(anh.hinh_dang), JSON.stringify(anh.du_lieu_cot), opts.ma_yeu_cau || null])).rows[0]
 
@@ -418,12 +458,14 @@ async function chotPhienBan(c, req, t0, opts) {
       so_phien_ban: soMoi, so_cot: t.so_cot,
       so_cot_them: ss.them.length, so_cot_sua: ss.sua.length, so_cot_xoa: ss.xoa.length,
       chieu_dai_tuyen_m: t.chieu_dai_tuyen_m, chieu_dai_cap_m: t.chieu_dai_cap_m,
+      phan_tram_lech_bac: tLech.phan_tram_lech_bac, phan_tram_lech_nam: tLech.phan_tram_lech_nam,
+      phan_tram_lech_dong: tLech.phan_tram_lech_dong, phan_tram_lech_tay: tLech.phan_tram_lech_tay,
       nguon_diem: thongKeNguonDiem(anh.du_lieu_cot), ghi_de: !!opts.ghi_de,
       ghi_chu: opts.ghi_chu || undefined,
       ...(opts.chi_tiet_them || {}),
     },
   })
-  return { tuyen: { ...t, phien_ban_hien_tai: soMoi }, phien_ban: pb }
+  return { tuyen: { ...tLech, phien_ban_hien_tai: soMoi }, phien_ban: chuanHoaLech(pb) }
 }
 
 async function hoanThien(req, id, body = {}) {
@@ -467,9 +509,10 @@ async function dsPhienBan(req, tuyenId) {
             tk.ho_ten AS tai_khoan_ho_ten, p.thiet_bi_id, p.thoi_gian_thiet_bi, p.thoi_gian_server,
             p.gps_kinh_do, p.gps_vi_do, p.gps_do_chinh_xac_m, p.so_cot, p.chieu_dai_tuyen_m,
             p.loai_cong_trinh_id, p.he_so_n, p.chieu_dai_cap_m,
+            p.phan_tram_lech_bac, p.phan_tram_lech_nam, p.phan_tram_lech_dong, p.phan_tram_lech_tay,
             p.so_cot_them, p.so_cot_sua, p.so_cot_xoa
        FROM tuyen_phien_ban p JOIN tai_khoan tk ON tk.id = p.tai_khoan_id
-      WHERE p.tuyen_id = $1 ORDER BY p.so_phien_ban DESC`, [tuyenId])).rows
+      WHERE p.tuyen_id = $1 ORDER BY p.so_phien_ban DESC`, [tuyenId])).rows.map(chuanHoaLech)
 }
 
 async function chiTietPhienBan(req, tuyenId, so) {

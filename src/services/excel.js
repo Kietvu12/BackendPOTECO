@@ -55,6 +55,10 @@ async function xuatTuyen(req, tuyenId) {
     ['Số cột', t.so_cot],
     ['Chiều dài tuyến (m)', t.chieu_dai_tuyen_m],
     ['Chiều dài cáp (m) = chiều dài tuyến × n', t.chieu_dai_cap_m],
+    ['% lệch Bắc', t.phan_tram_lech_bac != null ? Number(t.phan_tram_lech_bac) : 0],
+    ['% lệch Nam', t.phan_tram_lech_nam != null ? Number(t.phan_tram_lech_nam) : 0],
+    ['% lệch Đông', t.phan_tram_lech_dong != null ? Number(t.phan_tram_lech_dong) : 0],
+    ['% lệch Tây', t.phan_tram_lech_tay != null ? Number(t.phan_tram_lech_tay) : 0],
     ['Phiên bản hiện tại', t.phien_ban_hien_tai],
     ['Hoàn thiện lúc', dinhDangGio(t.hoan_thien_luc)],
   ]
@@ -65,8 +69,13 @@ async function xuatTuyen(req, tuyenId) {
     r.getCell(1).font = { bold: true }
     if (v instanceof Date) r.getCell(2).numFmt = 'dd/mm/yyyy hh:mm'
   }
+  // Chiều dài tuyến / cáp (hàng 7–8 trong khối tổng hợp)
   ws.getCell('B7').numFmt = '#,##0.00'
   ws.getCell('B8').numFmt = '#,##0.00'
+  ws.getCell('B9').numFmt = '0.##"%"'
+  ws.getCell('B10').numFmt = '0.##"%"'
+  ws.getCell('B11').numFmt = '0.##"%"'
+  ws.getCell('B12').numFmt = '0.##"%"'
 
   taoSheet(wb, 'Cột', [
     { tieu_de: 'STT', khoa: 'thu_tu', rong: 6 },
