@@ -14,7 +14,7 @@ jobs:
       - name: Pull code, cài thư viện, migrate, restart
         run: |
           set -e
-          cd /home/BackendPOTECO
+          cd /var/www/.backendpoteco
           git pull --ff-only origin main
           npm ci --omit=dev
           SQL_DIR=db node db/migrate.js
